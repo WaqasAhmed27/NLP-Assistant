@@ -3,6 +3,13 @@ import pandas as pd
 import io
 import re
 import string
+from collections import Counter
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Configure page
 st.set_page_config(
@@ -28,6 +35,8 @@ def init_session_state():
         st.session_state.preprocessing_enabled = False
     if "processed_text" not in st.session_state:
         st.session_state.processed_text = ""
+    if "word_freq_analysis" not in st.session_state:
+        st.session_state.word_freq_analysis = {}
 
 def has_text_data(data):
     if isinstance(data, str):
@@ -223,6 +232,337 @@ def calculate_text_statistics(text_data, input_method="direct"):
         'vocabulary_richness': vocabulary_richness
     }
 
+def calculate_word_frequency(text_data, input_method="direct", min_frequency=1, max_words=100):
+    """
+    Calculate word frequency analysis
+    """
+    if isinstance(text_data, pd.Series):
+        # For CSV data, combine all documents
+        combined_text = ' '.join(text_data.astype(str))
+    else:
+        combined_text = str(text_data)
+    
+    if not combined_text.strip():
+        return {}, pd.DataFrame()
+    
+    # Extract words (already cleaned if preprocessing was applied)
+    words = [word.lower().strip() for word in combined_text.split() if word.strip()]
+    
+    # Count word frequencies
+    word_freq = Counter(words)
+    
+    # Filter by minimum frequency
+    filtered_freq = {word: count for word, count in word_freq.items() if count >= min_frequency}
+    
+    # Get top words
+    top_words = dict(Counter(filtered_freq).most_common(max_words))
+    
+    # Create DataFrame for display
+    freq_df = pd.DataFrame(list(top_words.items()), columns=['Word', 'Frequency'])
+    freq_df['Percentage'] = round((freq_df['Frequency'] / sum(top_words.values())) * 100, 2)
+    
+    # Calculate additional metrics
+    total_unique_words = len(word_freq)
+    total_word_instances = sum(word_freq.values())
+    
+    analysis_results = {
+        'word_frequencies': top_words,
+        'total_unique_words': total_unique_words,
+        'total_word_instances': total_word_instances,
+        'vocabulary_diversity': round(total_unique_words / total_word_instances * 100, 2) if total_word_instances > 0 else 0,
+        'freq_dataframe': freq_df
+    }
+    
+    return analysis_results, freq_df
+
+def create_word_cloud(word_frequencies, width=800, height=400):
+    """
+    Generate word cloud from word frequencies
+    """
+    if not word_frequencies:
+        return None
+    
+    try:
+        # Create WordCloud object
+        wordcloud = WordCloud(
+            width=width,
+            height=height,
+            background_color='white',
+            colormap='viridis',
+            max_words=100,
+            relative_scaling=0.5,
+            min_font_size=10
+        ).generate_from_frequencies(word_frequencies)
+        
+        return wordcloud
+    except Exception as e:
+        st.error(f"Error generating word cloud: {e}")
+        return None
+
+def create_frequency_charts(freq_df, top_n=20):
+    """
+    Create interactive frequency charts using Plotly
+    """
+    if freq_df.empty:
+        return None, None
+    
+    # Limit to top N words for better visualization
+    display_df = freq_df.head(top_n)
+    
+    # Bar chart
+    fig_bar = px.bar(
+        display_df,
+        x='Frequency',
+        y='Word',
+        orientation='h',
+        title=f'Top {len(display_df)} Most Frequent Words',
+        labels={'Frequency': 'Word Frequency', 'Word': 'Words'},
+        color='Frequency',
+        color_continuous_scale='viridis'
+    )
+    fig_bar.update_layout(
+        height=max(400, len(display_df) * 25),
+        yaxis={'categoryorder': 'total ascending'}
+    )
+    
+    # Pie chart for percentage distribution
+    fig_pie = px.pie(
+        display_df.head(10),  # Limit pie chart to top 10 for readability
+        values='Frequency',
+        names='Word',
+        title='Top 10 Words - Distribution',
+        color_discrete_sequence=px.colors.qualitative.Set3
+    )
+    
+    return fig_bar, fig_pie
+
+def display_word_frequency_analysis(text_data, input_method="direct"):
+    """
+    Display comprehensive word frequency analysis
+    """
+    st.header("📊 Word Frequency Analysis")
+    
+    # Configuration options
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        min_frequency = st.number_input(
+            "Minimum word frequency:",
+            min_value=1,
+            max_value=100,
+            value=1,
+            help="Only show words that appear at least this many times"
+        )
+    
+    with col2:
+        max_words = st.number_input(
+            "Maximum words to display:",
+            min_value=10,
+            max_value=500,
+            value=50,
+            help="Limit the number of words shown in frequency tables"
+        )
+    
+    with col3:
+        chart_top_n = st.number_input(
+            "Top N words for charts:",
+            min_value=5,
+            max_value=50,
+            value=20,
+            help="Number of top words to show in charts"
+        )
+    
+    # Calculate word frequency
+    with st.spinner("🔍 Analyzing word frequencies..."):
+        analysis_results, freq_df = calculate_word_frequency(
+            text_data, 
+            input_method, 
+            min_frequency, 
+            max_words
+        )
+    
+    if not analysis_results or freq_df.empty:
+        st.warning("⚠️ No word frequency data available. Make sure your text contains words.")
+        return
+    
+    # Store results in session state
+    st.session_state.word_freq_analysis = analysis_results
+    
+    # Display summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "📚 Total Unique Words",
+            f"{analysis_results['total_unique_words']:,}",
+            help="Total number of unique words in the text"
+        )
+    
+    with col2:
+        st.metric(
+            "🔢 Total Word Instances",
+            f"{analysis_results['total_word_instances']:,}",
+            help="Total number of word occurrences"
+        )
+    
+    with col3:
+        st.metric(
+            "🎯 Vocabulary Diversity",
+            f"{analysis_results['vocabulary_diversity']}%",
+            help="Ratio of unique words to total words"
+        )
+    
+    with col4:
+        st.metric(
+            "📋 Words Displayed",
+            f"{len(freq_df):,}",
+            help="Number of words meeting frequency criteria"
+        )
+    
+    # Tabs for different visualizations
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Frequency Charts", "☁️ Word Cloud", "📄 Frequency Table", "📈 Distribution Analysis"])
+    
+    with tab1:
+        st.subheader("📊 Word Frequency Charts")
+        
+        # Create charts
+        fig_bar, fig_pie = create_frequency_charts(freq_df, chart_top_n)
+        
+        if fig_bar and fig_pie:
+            # Display bar chart
+            st.plotly_chart(fig_bar, use_container_width=True)
+            
+            # Display pie chart
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.warning("Unable to create frequency charts.")
+    
+    with tab2:
+        st.subheader("☁️ Word Cloud")
+        
+        # Word cloud configuration
+        col1, col2 = st.columns([2, 1])
+        
+        with col2:
+            wc_width = st.slider("Width", 400, 1200, 800)
+            wc_height = st.slider("Height", 300, 800, 400)
+            colormap = st.selectbox(
+                "Color scheme:",
+                ['viridis', 'plasma', 'inferno', 'magma', 'Blues', 'Reds', 'Greens']
+            )
+        
+        with col1:
+            # Generate word cloud
+            with st.spinner("🎨 Generating word cloud..."):
+                try:
+                    wordcloud = WordCloud(
+                        width=wc_width,
+                        height=wc_height,
+                        background_color='white',
+                        colormap=colormap,
+                        max_words=100,
+                        relative_scaling=0.5,
+                        min_font_size=10
+                    ).generate_from_frequencies(analysis_results['word_frequencies'])
+                    
+                    # Display word cloud
+                    fig, ax = plt.subplots(figsize=(wc_width/100, wc_height/100))
+                    ax.imshow(wordcloud, interpolation='bilinear')
+                    ax.axis('off')
+                    st.pyplot(fig)
+                    plt.close(fig)
+                    
+                except Exception as e:
+                    st.error(f"Error generating word cloud: {e}")
+                    st.info("💡 Try enabling text preprocessing to improve word cloud generation.")
+    
+    with tab3:
+        st.subheader("📄 Word Frequency Table")
+        
+        # Display frequency table with search functionality
+        if not freq_df.empty:
+            # Search functionality
+            search_term = st.text_input(
+                "🔍 Search words:",
+                placeholder="Type to filter words...",
+                help="Search for specific words in the frequency table"
+            )
+            
+            # Filter dataframe based on search
+            if search_term:
+                filtered_df = freq_df[freq_df['Word'].str.contains(search_term, case=False, na=False)]
+                st.info(f"Found {len(filtered_df)} words matching '{search_term}'")
+            else:
+                filtered_df = freq_df
+            
+            # Display table
+            st.dataframe(
+                filtered_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Word": st.column_config.TextColumn("Word", width="medium"),
+                    "Frequency": st.column_config.NumberColumn("Frequency", width="small"),
+                    "Percentage": st.column_config.NumberColumn("Percentage (%)", width="small", format="%.2f%%")
+                }
+            )
+            
+            # Download button for frequency data
+            csv_data = filtered_df.to_csv(index=False)
+            st.download_button(
+                "📥 Download Frequency Data",
+                csv_data,
+                "word_frequency.csv",
+                "text/csv",
+                help="Download the word frequency table as CSV"
+            )
+        else:
+            st.warning("No frequency data to display.")
+    
+    with tab4:
+        st.subheader("📈 Distribution Analysis")
+        
+        if not freq_df.empty:
+            # Frequency distribution histogram
+            fig_hist = px.histogram(
+                freq_df,
+                x='Frequency',
+                nbins=min(20, len(freq_df)),
+                title='Word Frequency Distribution',
+                labels={'Frequency': 'Word Frequency', 'count': 'Number of Words'}
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+            
+            # Statistics about frequency distribution
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**📊 Frequency Statistics:**")
+                st.write(f"• **Mean frequency:** {freq_df['Frequency'].mean():.2f}")
+                st.write(f"• **Median frequency:** {freq_df['Frequency'].median():.2f}")
+                st.write(f"• **Most frequent word:** '{freq_df.iloc[0]['Word']}' ({freq_df.iloc[0]['Frequency']} times)")
+                st.write(f"• **Words appearing once:** {len(freq_df[freq_df['Frequency'] == 1])}")
+            
+            with col2:
+                st.write("**📈 Distribution Insights:**")
+                high_freq_words = len(freq_df[freq_df['Frequency'] >= freq_df['Frequency'].quantile(0.9)])
+                medium_freq_words = len(freq_df[(freq_df['Frequency'] >= freq_df['Frequency'].quantile(0.5)) & 
+                                               (freq_df['Frequency'] < freq_df['Frequency'].quantile(0.9))])
+                low_freq_words = len(freq_df[freq_df['Frequency'] < freq_df['Frequency'].quantile(0.5)])
+                
+                st.write(f"• **High frequency words (top 10%):** {high_freq_words}")
+                st.write(f"• **Medium frequency words:** {medium_freq_words}")
+                st.write(f"• **Low frequency words (bottom 50%):** {low_freq_words}")
+                
+                # Zipf's law approximation
+                if len(freq_df) > 1:
+                    freq_df_sorted = freq_df.sort_values('Frequency', ascending=False).reset_index(drop=True)
+                    freq_df_sorted['Rank'] = freq_df_sorted.index + 1
+                    freq_df_sorted['Expected_Zipf'] = freq_df_sorted.iloc[0]['Frequency'] / freq_df_sorted['Rank']
+                    
+                    zipf_correlation = freq_df_sorted['Frequency'].corr(freq_df_sorted['Expected_Zipf'])
+                    st.write(f"• **Zipf's Law correlation:** {zipf_correlation:.3f}")
+
 def display_text_statistics(stats):
     """Display text statistics in a formatted layout"""
     if not stats:
@@ -366,45 +706,6 @@ def display_preprocessing_comparison(original_text, processed_text, input_method
         
         st.info(f"📊 Processing reduced word count by {reduction}% (from {original_words:,} to {processed_words:,} words)")
 
-@st.cache_data
-def load_csv_data(file):
-    """Load CSV data and detect text columns"""
-    try:
-        # Try different delimiters
-        df = pd.read_csv(file)
-        if df.shape[1] == 1:
-            file.seek(0)
-            df = pd.read_csv(file, delimiter=';')
-        if df.shape[1] == 1:
-            file.seek(0)
-            df = pd.read_csv(file, delimiter='\t')
-        if df.shape[1] == 1:
-            file.seek(0)
-            df = pd.read_csv(file, delimiter='|')
-        
-        # Detect text columns
-        text_columns = []
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                # Check if column contains substantial text (avg length > 20 chars)
-                avg_length = df[col].astype(str).str.len().mean()
-                if avg_length > 20:
-                    text_columns.append(col)
-        
-        return df, text_columns
-    
-    except Exception as e:
-        st.error(f"Error reading CSV: {e}")
-        return pd.DataFrame(), []
-
-def combine_csv_text(df, text_column):
-    """Combine all text from a CSV column into analysis format"""
-    # Remove NaN values and convert to string
-    text_series = df[text_column].dropna().astype(str)
-    
-    # For analysis, we'll treat each row as a separate document
-    return text_series
-
 # ---- Init session state ----
 init_session_state()
 
@@ -514,11 +815,12 @@ with st.sidebar:
             st.session_state.has_text = False
             st.session_state.preprocessing_enabled = False
             st.session_state.processed_text = ""
+            st.session_state.word_freq_analysis = {}
             st.rerun()
     
     st.markdown("---")
     
-    # NEW: Text Preprocessing Section
+    # Text Preprocessing Section
     st.header("⚙️ 2. Text Preprocessing")
     
     if st.session_state.has_text:
@@ -587,6 +889,7 @@ with st.sidebar:
                 if st.button("🔄 Reset to Original"):
                     st.session_state.preprocessing_enabled = False
                     st.session_state.processed_text = ""
+                    st.session_state.word_freq_analysis = {}
                     st.success("✅ Reset to original text!")
                     st.rerun()
         
@@ -595,6 +898,7 @@ with st.sidebar:
             if st.session_state.preprocessing_enabled:
                 st.session_state.preprocessing_enabled = False
                 st.session_state.processed_text = ""
+                st.session_state.word_freq_analysis = {}
     
     else:
         st.info("💡 Upload or enter text first to access preprocessing options")
@@ -649,7 +953,12 @@ if st.session_state.has_text and has_text_data(st.session_state.text_data):
     # Display detailed statistics
     display_text_statistics(stats)
     
+    # NEW: Word Frequency Analysis Section
+    st.markdown("---")
+    display_word_frequency_analysis(analysis_text, input_method_type)
+    
     # Text preview section
+    st.markdown("---")
     st.subheader("📖 Text Preview")
     
     if input_method_type == "csv" and isinstance(analysis_text, pd.Series):
@@ -696,27 +1005,32 @@ else:
        - See detailed word, character, and document counts
        - Compare before/after preprocessing results
        - View vocabulary richness and readability metrics
-       - Preview your text content
+       - **NEW**: Analyze word frequencies with interactive charts
+       - **NEW**: Generate beautiful word clouds
+       - **NEW**: Explore frequency distributions and patterns
 
-    ### 📊 Available Statistics:
+    ### 📊 Available Features:
 
-    - **Basic Counts**: Words, characters, sentences, paragraphs
+    - **Basic Statistics**: Words, characters, sentences, paragraphs
     - **Document Analysis**: Multiple document support for CSV files
     - **Vocabulary Metrics**: Unique words and vocabulary richness
     - **Readability**: Average words per sentence, characters per word
     - **Text Density**: Words per document for multi-document analysis
-    - **Preprocessing Impact**: Before/after comparison metrics
+    - **🆕 Word Frequency Analysis**: Top words, frequency tables, search functionality
+    - **🆕 Word Clouds**: Customizable visual word representations
+    - **🆕 Frequency Charts**: Interactive bar charts and pie charts
+    - **🆕 Distribution Analysis**: Frequency patterns and Zipf's law correlation
 
     ### 🚀 Coming Soon:
 
-    - Word frequency analysis and word clouds
     - Sentiment analysis with visualizations
     - AI-powered insights and recommendations
     - Advanced text preprocessing options
+    - Topic modeling and document clustering
 
     **Ready to start?** Choose your input method in the sidebar!
     """)
 
 # Footer
 st.markdown("---")
-st.markdown("**Built with ❤️ using Streamlit**")
+st.markdown("**Built with ❤️ using Streamlit • Now featuring Word Frequency Analysis!**")
