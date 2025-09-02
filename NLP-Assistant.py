@@ -10,6 +10,9 @@ from wordcloud import WordCloud
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import numpy as np
+from datetime import datetime
 
 # Configure page
 st.set_page_config(
@@ -706,6 +709,490 @@ def display_preprocessing_comparison(original_text, processed_text, input_method
         
         st.info(f"📊 Processing reduced word count by {reduction}% (from {original_words:,} to {processed_words:,} words)")
 
+# Add these imports at the top with other imports
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import numpy as np
+from datetime import datetime
+
+# Add sentiment analysis functions after the word frequency functions
+
+def analyze_sentiment_vader(text_data, input_method="direct"):
+    """
+    Analyze sentiment using VADER sentiment analyzer
+    Returns sentiment scores and classifications
+    """
+    analyzer = SentimentIntensityAnalyzer()
+    
+    if isinstance(text_data, pd.Series):
+        # For CSV data, analyze each document separately
+        documents = text_data.astype(str).tolist()
+        results = []
+        
+        for i, doc in enumerate(documents):
+            if doc.strip():  # Skip empty documents
+                scores = analyzer.polarity_scores(doc)
+                
+                # Classify sentiment based on compound score
+                if scores['compound'] >= 0.05:
+                    sentiment = 'Positive'
+                elif scores['compound'] <= -0.05:
+                    sentiment = 'Negative'
+                else:
+                    sentiment = 'Neutral'
+                
+                results.append({
+                    'document_id': i + 1,
+                    'sentiment': sentiment,
+                    'compound': scores['compound'],
+                    'positive': scores['pos'],
+                    'negative': scores['neg'],
+                    'neutral': scores['neu'],
+                    'word_count': len(doc.split()),
+                    'text_preview': doc[:100] + "..." if len(doc) > 100 else doc
+                })
+        
+        return results
+    
+    else:
+        # For single document
+        text_str = str(text_data)
+        if not text_str.strip():
+            return None
+        
+        scores = analyzer.polarity_scores(text_str)
+        
+        # Classify sentiment
+        if scores['compound'] >= 0.05:
+            sentiment = 'Positive'
+        elif scores['compound'] <= -0.05:
+            sentiment = 'Negative'
+        else:
+            sentiment = 'Neutral'
+        
+        return {
+            'sentiment': sentiment,
+            'compound': scores['compound'],
+            'positive': scores['pos'],
+            'negative': scores['neg'],
+            'neutral': scores['neu'],
+            'word_count': len(text_str.split())
+        }
+
+def create_sentiment_visualizations(sentiment_results, input_method="direct"):
+    """
+    Create sentiment analysis visualizations using Plotly
+    """
+    if not sentiment_results:
+        return None, None, None
+    
+    if input_method == "csv" and isinstance(sentiment_results, list):
+        # For CSV data - multiple documents
+        df_results = pd.DataFrame(sentiment_results)
+        
+        # 1. Sentiment Distribution Pie Chart
+        sentiment_counts = df_results['sentiment'].value_counts()
+        fig_pie = px.pie(
+            values=sentiment_counts.values,
+            names=sentiment_counts.index,
+            title='Sentiment Distribution Across Documents',
+            color_discrete_map={
+                'Positive': '#2E8B57',
+                'Negative': '#DC143C', 
+                'Neutral': '#708090'
+            }
+        )
+        
+        # 2. Compound Score Distribution
+        fig_hist = px.histogram(
+            df_results,
+            x='compound',
+            nbins=20,
+            title='Compound Sentiment Score Distribution',
+            labels={'compound': 'Compound Score', 'count': 'Number of Documents'},
+            color_discrete_sequence=['#4472C4']
+        )
+        fig_hist.add_vline(x=0.05, line_dash="dash", line_color="green", 
+                          annotation_text="Positive Threshold")
+        fig_hist.add_vline(x=-0.05, line_dash="dash", line_color="red", 
+                          annotation_text="Negative Threshold")
+        
+        # 3. Sentiment Components Bar Chart
+        avg_scores = df_results[['positive', 'negative', 'neutral']].mean()
+        fig_bar = px.bar(
+            x=['Positive', 'Negative', 'Neutral'],
+            y=avg_scores.values,
+            title='Average Sentiment Component Scores',
+            labels={'x': 'Sentiment Component', 'y': 'Average Score'},
+            color=['#2E8B57', '#DC143C', '#708090']
+        )
+        
+        return fig_pie, fig_hist, fig_bar
+    
+    else:
+        # For single document
+        scores = [sentiment_results['positive'], sentiment_results['negative'], 
+                 sentiment_results['neutral']]
+        labels = ['Positive', 'Negative', 'Neutral']
+        colors = ['#2E8B57', '#DC143C', '#708090']
+        
+        # Sentiment components bar chart
+        fig_bar = px.bar(
+            x=labels,
+            y=scores,
+            title='Sentiment Component Scores',
+            labels={'x': 'Sentiment Component', 'y': 'Score'},
+            color=labels,
+            color_discrete_map={
+                'Positive': '#2E8B57',
+                'Negative': '#DC143C', 
+                'Neutral': '#708090'
+            }
+        )
+        
+        # Compound score gauge
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = sentiment_results['compound'],
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "Overall Sentiment (Compound Score)"},
+            delta = {'reference': 0},
+            gauge = {
+                'axis': {'range': [-1, 1]},
+                'bar': {'color': "darkblue"},
+                'steps': [
+                    {'range': [-1, -0.05], 'color': "lightcoral"},
+                    {'range': [-0.05, 0.05], 'color': "lightgray"},
+                    {'range': [0.05, 1], 'color': "lightgreen"}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 0.9
+                }
+            }
+        ))
+        
+        return fig_bar, fig_gauge, None
+
+def display_sentiment_analysis(text_data, input_method="direct"):
+    """
+    Display comprehensive sentiment analysis
+    """
+    st.header("😊 Sentiment Analysis")
+    st.write("Analyze the emotional tone and sentiment of your text using VADER sentiment analysis.")
+    
+    # Analyze sentiment
+    with st.spinner("🔍 Analyzing sentiment..."):
+        sentiment_results = analyze_sentiment_vader(text_data, input_method)
+    
+    if not sentiment_results:
+        st.warning("⚠️ No sentiment data available. Make sure your text contains analyzable content.")
+        return
+    
+    # Store results in session state
+    st.session_state.sentiment_analysis = sentiment_results
+    
+    # Display results based on input method
+    if input_method == "csv" and isinstance(sentiment_results, list):
+        # Multiple documents analysis
+        df_results = pd.DataFrame(sentiment_results)
+        
+        # Summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        sentiment_counts = df_results['sentiment'].value_counts()
+        total_docs = len(df_results)
+        avg_compound = df_results['compound'].mean()
+        
+        with col1:
+            st.metric(
+                "📊 Total Documents",
+                f"{total_docs:,}",
+                help="Total number of documents analyzed"
+            )
+        
+        with col2:
+            most_common_sentiment = sentiment_counts.index[0]
+            most_common_count = sentiment_counts.iloc[0]
+            st.metric(
+                "🎯 Dominant Sentiment",
+                most_common_sentiment,
+                f"{round(most_common_count/total_docs*100, 1)}%"
+            )
+        
+        with col3:
+            st.metric(
+                "📈 Average Compound Score",
+                f"{avg_compound:.3f}",
+                help="Overall sentiment intensity (-1 to +1)"
+            )
+        
+        with col4:
+            positive_pct = round(len(df_results[df_results['sentiment'] == 'Positive']) / total_docs * 100, 1)
+            st.metric(
+                "😊 Positive Documents",
+                f"{positive_pct}%",
+                help="Percentage of documents with positive sentiment"
+            )
+        
+        # Tabs for different views
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Visualizations", "📋 Document Results", "📈 Detailed Analysis", "📥 Export"])
+        
+        with tab1:
+            st.subheader("📊 Sentiment Visualizations")
+            
+            # Create visualizations
+            fig_pie, fig_hist, fig_bar = create_sentiment_visualizations(sentiment_results, input_method)
+            
+            if fig_pie and fig_hist and fig_bar:
+                # Display pie chart
+                st.plotly_chart(fig_pie, use_container_width=True)
+                
+                # Display histogram
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+                # Display bar chart
+                st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with tab2:
+            st.subheader("📋 Document-by-Document Results")
+            
+            # Filters
+            col1, col2 = st.columns(2)
+            with col1:
+                sentiment_filter = st.selectbox(
+                    "Filter by sentiment:",
+                    ["All", "Positive", "Negative", "Neutral"]
+                )
+            with col2:
+                sort_by = st.selectbox(
+                    "Sort by:",
+                    ["Document ID", "Compound Score", "Word Count"]
+                )
+            
+            # Apply filters
+            filtered_df = df_results.copy()
+            if sentiment_filter != "All":
+                filtered_df = filtered_df[filtered_df['sentiment'] == sentiment_filter]
+            
+            # Apply sorting
+            if sort_by == "Compound Score":
+                filtered_df = filtered_df.sort_values('compound', ascending=False)
+            elif sort_by == "Word Count":
+                filtered_df = filtered_df.sort_values('word_count', ascending=False)
+            else:
+                filtered_df = filtered_df.sort_values('document_id')
+            
+            # Display results
+            st.dataframe(
+                filtered_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "document_id": st.column_config.NumberColumn("Doc ID", width="small"),
+                    "sentiment": st.column_config.TextColumn("Sentiment", width="medium"),
+                    "compound": st.column_config.NumberColumn("Compound", width="small", format="%.3f"),
+                    "positive": st.column_config.NumberColumn("Positive", width="small", format="%.3f"),
+                    "negative": st.column_config.NumberColumn("Negative", width="small", format="%.3f"),
+                    "neutral": st.column_config.NumberColumn("Neutral", width="small", format="%.3f"),
+                    "word_count": st.column_config.NumberColumn("Words", width="small"),
+                    "text_preview": st.column_config.TextColumn("Text Preview", width="large")
+                }
+            )
+        
+        with tab3:
+            st.subheader("📈 Detailed Analysis")
+            
+            # Sentiment distribution breakdown
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**📊 Sentiment Distribution:**")
+                for sentiment, count in sentiment_counts.items():
+                    percentage = round(count / total_docs * 100, 1)
+                    st.write(f"• **{sentiment}:** {count} documents ({percentage}%)")
+            
+            with col2:
+                st.write("**📈 Score Statistics:**")
+                st.write(f"• **Highest compound score:** {df_results['compound'].max():.3f}")
+                st.write(f"• **Lowest compound score:** {df_results['compound'].min():.3f}")
+                st.write(f"• **Standard deviation:** {df_results['compound'].std():.3f}")
+                st.write(f"• **Median compound score:** {df_results['compound'].median():.3f}")
+            
+            # Most positive and negative documents
+            st.write("**🏆 Extreme Examples:**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                most_positive = df_results.loc[df_results['compound'].idxmax()]
+                st.success(f"**Most Positive Document (ID: {most_positive['document_id']})**")
+                st.write(f"Compound Score: {most_positive['compound']:.3f}")
+                st.write(f"Preview: {most_positive['text_preview']}")
+            
+            with col2:
+                most_negative = df_results.loc[df_results['compound'].idxmin()]
+                st.error(f"**Most Negative Document (ID: {most_negative['document_id']})**")
+                st.write(f"Compound Score: {most_negative['compound']:.3f}")
+                st.write(f"Preview: {most_negative['text_preview']}")
+        
+        with tab4:
+            st.subheader("📥 Export Results")
+            
+            # Create downloadable CSV
+            export_df = df_results.drop('text_preview', axis=1)  # Remove preview for cleaner export
+            csv_data = export_df.to_csv(index=False)
+            
+            st.download_button(
+                "📥 Download Sentiment Results (CSV)",
+                csv_data,
+                f"sentiment_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                "text/csv",
+                help="Download detailed sentiment analysis results"
+            )
+            
+            # Summary report
+            summary_report = f"""
+Sentiment Analysis Summary Report
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Total Documents Analyzed: {total_docs:,}
+Dominant Sentiment: {most_common_sentiment} ({round(most_common_count/total_docs*100, 1)}%)
+Average Compound Score: {avg_compound:.3f}
+
+Sentiment Breakdown:
+{chr(10).join([f"- {sentiment}: {count} documents ({round(count/total_docs*100, 1)}%)" for sentiment, count in sentiment_counts.items()])}
+
+Score Statistics:
+- Highest: {df_results['compound'].max():.3f}
+- Lowest: {df_results['compound'].min():.3f}
+- Median: {df_results['compound'].median():.3f}
+- Standard Deviation: {df_results['compound'].std():.3f}
+            """
+            
+            st.download_button(
+                "📄 Download Summary Report (TXT)",
+                summary_report,
+                f"sentiment_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                "text/plain",
+                help="Download a summary report of the sentiment analysis"
+            )
+    
+    else:
+        # Single document analysis
+        sentiment = sentiment_results['sentiment']
+        compound = sentiment_results['compound']
+        
+        # Display main result with appropriate styling
+        if sentiment == 'Positive':
+            st.success(f"🟢 **Overall Sentiment: {sentiment}**")
+        elif sentiment == 'Negative':
+            st.error(f"🔴 **Overall Sentiment: {sentiment}**")
+        else:
+            st.info(f"⚪ **Overall Sentiment: {sentiment}**")
+        
+        # Metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "📊 Compound Score",
+                f"{compound:.3f}",
+                help="Overall sentiment intensity (-1 to +1)"
+            )
+        
+        with col2:
+            st.metric(
+                "😊 Positive",
+                f"{sentiment_results['positive']:.3f}",
+                help="Positive sentiment component"
+            )
+        
+        with col3:
+            st.metric(
+                "😞 Negative", 
+                f"{sentiment_results['negative']:.3f}",
+                help="Negative sentiment component"
+            )
+        
+        with col4:
+            st.metric(
+                "😐 Neutral",
+                f"{sentiment_results['neutral']:.3f}",
+                help="Neutral sentiment component"
+            )
+        
+        # Tabs for visualizations and interpretation
+        tab1, tab2 = st.tabs(["📊 Visualizations", "💡 Interpretation"])
+        
+        with tab1:
+            st.subheader("📊 Sentiment Breakdown")
+            
+            # Create visualizations
+            fig_bar, fig_gauge, _ = create_sentiment_visualizations(sentiment_results, input_method)
+            
+            if fig_bar and fig_gauge:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                
+                with col2:
+                    st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        with tab2:
+            st.subheader("💡 Sentiment Interpretation")
+            
+            # Provide interpretation based on scores
+            st.write("**🎯 What these scores mean:**")
+            
+            # Compound score interpretation
+            if compound >= 0.5:
+                st.write("• **Very Positive**: The text expresses strong positive sentiment")
+            elif compound >= 0.05:
+                st.write("• **Positive**: The text leans toward positive sentiment")
+            elif compound <= -0.5:
+                st.write("• **Very Negative**: The text expresses strong negative sentiment")
+            elif compound <= -0.05:
+                st.write("• **Negative**: The text leans toward negative sentiment")
+            else:
+                st.write("• **Neutral**: The text expresses balanced or neutral sentiment")
+            
+            # Component analysis
+            st.write("**🔍 Component Analysis:**")
+            
+            max_component = max(sentiment_results['positive'], sentiment_results['negative'], sentiment_results['neutral'])
+            
+            if sentiment_results['positive'] == max_component:
+                st.write("• The text contains primarily positive language and expressions")
+            elif sentiment_results['negative'] == max_component:
+                st.write("• The text contains primarily negative language and expressions")
+            else:
+                st.write("• The text contains primarily neutral language")
+            
+            # Score ranges explanation
+            with st.expander("📚 Understanding VADER Scores"):
+                st.write("""
+                **VADER Sentiment Scoring:**
+                
+                **Compound Score (-1 to +1):**
+                - **+0.05 to +1.0**: Positive sentiment
+                - **-0.05 to +0.05**: Neutral sentiment  
+                - **-1.0 to -0.05**: Negative sentiment
+                
+                **Component Scores (0 to 1):**
+                - **Positive**: Proportion of positive sentiment
+                - **Negative**: Proportion of negative sentiment
+                - **Neutral**: Proportion of neutral sentiment
+                - All components sum to 1.0
+                
+                **VADER Advantages:**
+                - Handles social media text, emoticons, and slang
+                - Considers punctuation and capitalization for intensity
+                - Fast and lightweight analysis
+                - No training data required
+                """)
+
 # ---- Init session state ----
 init_session_state()
 
@@ -956,6 +1443,10 @@ if st.session_state.has_text and has_text_data(st.session_state.text_data):
     # NEW: Word Frequency Analysis Section
     st.markdown("---")
     display_word_frequency_analysis(analysis_text, input_method_type)
+    
+    # NEW: Sentiment Analysis Section
+    st.markdown("---")
+    display_sentiment_analysis(analysis_text, input_method_type)
     
     # Text preview section
     st.markdown("---")
