@@ -1,66 +1,90 @@
-# 🔤 NLP Assistant
+Of course! Here is the updated `README.md` file, completely rewritten to reflect the new AI-powered, multi-workflow capabilities of your application.
 
-**Automated Text Analysis with AI-Powered Insights**
+---
 
-A comprehensive Streamlit application for text analysis and natural language processing. Upload text files, CSV datasets, or paste text directly to get detailed insights about your content.
+# 🤖 AI-Powered NLP Assistant
 
-## ✨ Features
+**Intelligent Text Processing with AI-Driven Workflow Detection**
 
-### 📊 Current Features
-- **Multiple Input Methods**
-  - Direct text input with large text area
-  - Text file upload (.txt files)
-  - CSV file upload with automatic text column detection
-- **Comprehensive Text Statistics**
-  - Word count, character count (with/without spaces)
-  - Document count and multi-document analysis
-  - Sentence and paragraph counting
-  - Vocabulary richness and unique word analysis
-  - Readability metrics (avg words per sentence, chars per word)
-- **Smart CSV Processing**
-  - Automatic delimiter detection (comma, semicolon, tab, pipe)
-  - Text column identification (columns with avg >20 characters)
-  - Document-level analysis for CSV rows
-- **Interactive UI**
-  - Clean sidebar workflow
-  - Real-time statistics display
-  - Text preview with smart truncation
-  - Responsive metrics layout
+A sophisticated Streamlit application that provides context-aware text analysis. Instead of generic metrics, this tool uses AI to detect your content type (e.g., social media posts, customer reviews, business documents) and applies a specialized analysis workflow to extract meaningful, domain-specific insights.
 
-### 🚀 Coming Soon
-- Advanced text preprocessing options
-- Word frequency analysis and word clouds
-- Sentiment analysis with visualizations
-- AI-powered insights and recommendations
-- Topic modeling and keyword extraction
+## ✨ Key Features
+
+### 🧠 Core Intelligence
+- **AI Workflow Detection**: Automatically analyzes your text and recommends the most appropriate processing workflow.
+- **Specialized Analysis Modules**: Go beyond basic stats with dedicated pipelines for different content types.
+- **Dynamic & Interactive UI**: The user interface adapts to your chosen workflow, presenting relevant charts and metrics.
+
+### 🧰 Universal Analytics Suite
+- **Comprehensive Text Statistics**: In-depth metrics including word/character/sentence counts, vocabulary richness, and readability scores.
+- **Sentiment Analysis**: Powered by VADER, providing compound, positive, negative, and neutral scores with clear visualizations.
+- **Word Frequency Analysis**: Identify top keywords, view frequency distributions, and generate interactive charts.
+- **Advanced Data Preprocessing**: Clean your text by converting to lowercase, removing punctuation, stopwords, numbers, and extra whitespace.
+
+### 📥 Flexible I/O
+- **Multiple Input Methods**: Paste text directly, upload `.txt` files, or process entire columns from `.csv` files.
+- **Smart CSV Handling**: Automatically detects delimiters and identifies text-heavy columns for analysis.
+- **Multi-Format Export**: Download your complete analysis as a JSON report, export tabular data to CSV, or get a quick summary `.txt` report.
+
+## 🚀 How It Works
+
+1.  **📤 Input Your Content**: Choose your preferred method—direct paste, `.txt` upload, or `.csv` upload.
+2.  **🤖 Run AI Analysis**: Click a button to let the AI analyze a sample of your content and detect its type.
+3.  **🎯 Select Your Workflow**: Accept the AI's recommendation (e.g., "Social Media") or manually choose a different workflow.
+4.  **📊 Explore Tailored Results**: Dive into a multi-tab dashboard where the primary tab is customized for your chosen workflow, showing specialized charts and metrics alongside universal analytics.
+
+## 📋 Workflows in Detail
+
+#### 📱 Social Media Content
+- **Ideal for**: Tweets, posts, comments.
+- **Features**: Hashtag extraction & analysis, mention detection, emoji analysis, and engagement metric calculation.
+
+#### ⭐ Customer Feedback
+- **Ideal for**: Product reviews, survey responses, support tickets.
+- **Features**: Automatic rating extraction (e.g., "4 stars"), satisfaction keyword analysis, and issue categorization (e.g., service, product, delivery).
+
+#### 💼 Business Documents
+- **Ideal for**: Emails, reports, corporate communications.
+- **Features**: PII detection (emails, phone numbers), formality analysis (formal vs. informal language), and action item extraction.
+
+#### 📚 Academic & Research
+- **Ideal for**: Research papers, articles, abstracts.
+- **Features**: Citation detection, technical term identification, document structure analysis (e.g., abstract, references), and readability metrics.
+
+#### 📰 News & Media
+- **Ideal for**: News articles, press releases.
+- **Features**: Named Entity Recognition (NER), topic classification, and fact extraction (future feature).
+
+#### 📄 General Text
+- **Ideal for**: Mixed or unclassified content.
+- **Features**: A robust general-purpose analysis focusing on writing style, content structure, and readability.
 
 ## 🛠️ Installation
 
 ### Prerequisites
-- Python 3.7 or higher
-- pip package manager
+- Python 3.8 or higher
+- `pip` package manager
 
 ### Setup
 
-1. **Clone or download the project**
-   ```bash
-   git clone <your-repository-url>
-   cd nlp-assistant
-   ```
+1.  **Clone the repository**
+    ```bash
+    git clone <your-repository-url>
+    cd ai-nlp-assistant 
+    ```
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+2.  **Install dependencies from `requirements.txt`**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-3. **Run the application**
-   ```bash
-   streamlit run app.py
-   ```
+3.  **Run the application**
+    ```bash
+    streamlit run NLP-Assistant.py
+    ```
 
-4. **Open in browser**
-   - The app will automatically open at `http://localhost:8501`
-   - If it doesn't open automatically, navigate to the URL shown in terminal
+4.  **Open in browser**
+    - The app will launch at `http://localhost:8501`.
 
 ## 📋 Requirements
 
@@ -69,121 +93,40 @@ Create a `requirements.txt` file with the following dependencies:
 ```
 streamlit>=1.28.0
 pandas>=1.5.0
+matplotlib>=3.5.0
+seaborn>=0.12.0
+wordcloud>=1.9.0
+plotly>=5.10.0
+vaderSentiment>=3.3.2
+numpy>=1.23.0
+requests>=2.28.0
 ```
-
-## 🚀 Usage
-
-### 1. Choose Input Method
-
-**Direct Text Input**
-- Paste your text directly into the text area
-- Ideal for: Articles, reviews, social media posts, documents
-
-**Upload Text File**
-- Upload `.txt` files from your computer
-- Supports UTF-8 encoded text files
-- Ideal for: Large documents, reports, literature
-
-**Upload CSV File**
-- Upload CSV files with text columns
-- Automatic text column detection and selection
-- Ideal for: Customer reviews, survey responses, social media data
-
-### 2. Analyze Your Text
-
-- Click "📊 Analyze Text" to process your input
-- View comprehensive statistics instantly
-- Explore text preview and document structure
-
-### 3. Interpret Results
-
-**Core Metrics:**
-- **Total Words**: Overall word count in your text
-- **Total Characters**: Character count including/excluding spaces
-- **Unique Words**: Vocabulary diversity measure
-- **Documents**: Number of text segments or CSV rows
-
-**Advanced Metrics:**
-- **Vocabulary Richness**: Percentage of unique words (higher = more diverse)
-- **Avg Words/Sentence**: Readability indicator (12-20 is typical)
-- **Sentences & Paragraphs**: Document structure analysis
-- **Text Density**: Average content per document
-
-## 📁 File Support
-
-### Text Files (.txt)
-- UTF-8 encoding recommended
-- Any size supported (large files handled efficiently)
-- Automatic character count and preview
-
-### CSV Files (.csv)
-- Multiple delimiter support (comma, semicolon, tab, pipe)
-- Automatic text column detection
-- Minimum 20 characters average per cell for text columns
-- Multi-document analysis (each row = one document)
 
 ## 🎯 Use Cases
 
-### Content Analysis
-- **Blog Posts & Articles**: Analyze readability and word count
-- **Social Media**: Examine post engagement patterns
-- **Marketing Copy**: Optimize content length and complexity
-
-### Data Analysis
-- **Customer Reviews**: Bulk analysis of feedback data
-- **Survey Responses**: Open-ended response analysis
-- **Research Data**: Academic text corpus analysis
-
-### Writing Assistance
-- **Document Review**: Check length and complexity metrics
-- **Content Planning**: Understand text structure and density
-- **Quality Assessment**: Vocabulary richness and readability
+- **Marketing Teams**: Analyze social media campaign performance and customer feedback on new products.
+- **Business Analysts**: Quickly parse business communications for PII, action items, and overall sentiment.
+- **Academic Researchers**: Assess paper structure, identify key technical terms, and analyze citation density.
+- **Content Creators**: Optimize articles for readability and analyze writing style.
+- **Data Scientists**: Perform rapid exploratory data analysis on large text-based datasets from CSV files.
 
 ## 🔧 Technical Details
 
-### Architecture
-- **Frontend**: Streamlit with responsive layout
-- **Data Processing**: Pandas for CSV handling
-- **Text Analysis**: Python regex and string operations
-- **Caching**: Streamlit caching for efficient file processing
+- **Frontend**: Streamlit
+- **Data Handling**: Pandas
+- **Visualizations**: Plotly, Matplotlib, Seaborn, WordCloud
+- **Sentiment Analysis**: VADER
+- **Core NLP Logic**: Custom Python functions using regex and collections.
+- **State Management**: Streamlit Session State for a seamless multi-step user experience.
 
-### Performance
-- **Large Files**: Efficient processing of substantial text datasets
-- **Memory Management**: Smart loading and session state handling
-- **Real-time Updates**: Instant statistics calculation and display
+## 🚀 Future Enhancements
 
-## 🤝 Contributing
-
-This project is designed for educational and research purposes. Future enhancements will include:
-
-1. **Advanced NLP Features**
-   - Sentiment analysis
-   - Named entity recognition
-   - Topic modeling
-
-2. **Visualization Enhancements**
-   - Word clouds
-   - Interactive charts
-   - Text distribution plots
-
-3. **Export Capabilities**
-   - Statistics export to CSV/Excel
-   - Report generation
-   - Batch processing
-
-## 📞 Support
-
-For issues, suggestions, or contributions:
-- Create detailed issue reports with sample data
-- Include error messages and system information
-- Suggest new features with use case descriptions
-
-## 📄 License
-
-This project is open source and available for educational and research use.
+- **True LLM Integration**: Replace the mock AI detection with a real API call to a model like Google Gemini for higher accuracy.
+- **Advanced NLP Features**: Add Topic Modeling (LDA), Named Entity Recognition (NER), and Text Summarization.
+- **PII Redaction**: Add an option to automatically redact detected personal information.
+- **More Workflows**: Introduce new specialized workflows for Legal Documents, Medical Records, etc.
+- **Comparative Analysis**: Allow users to upload two documents and compare their metrics side-by-side.
 
 ---
 
 **Built with ❤️ using Streamlit**
-
-*Transform your text data into actionable insights with NLP Assistant!*
